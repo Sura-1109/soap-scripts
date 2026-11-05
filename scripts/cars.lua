@@ -72,4 +72,80 @@ local function executeDash()
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 0),
 			NumberSequenceKeypoint.new(0.8, 0.2),
-			NumberSequenceKeypoint.new(1,
+			NumberSequenceKeypoint.new(1, 1)
+		}),
+		Lifetime = NumberRange.new(0.15, 0.3),
+		Rate = 120,
+		Speed = NumberRange.new(15, 25),
+		EmissionDirection = Enum.NormalId.Back
+	})
+
+	local sparkEmitter = createEmitter(nitroAttachment, {
+		Texture = "rbxassetid://258129763",
+		Color = ColorSequence.new(Color3.fromRGB(180, 240, 255)),
+		Size = NumberSequence.new(0.35, 0.05),
+		Lifetime = NumberRange.new(0.2, 0.4),
+		Rate = 50,
+		Speed = NumberRange.new(20, 35),
+		SpreadAngle = Vector2.new(12, 12),
+		EmissionDirection = Enum.NormalId.Back
+	})
+
+	local nitroLight = Instance.new("PointLight")
+	nitroLight.Color = Color3.fromRGB(0, 170, 255)
+	nitroLight.Range = 16
+	nitroLight.Brightness = 4
+	nitroLight.Parent = hrp
+
+	-- 4. Camera Dynamics
+	local originalFOV = camera.FieldOfView
+	local fovInTween = TweenService:Create(
+		camera,
+		TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ FieldOfView = originalFOV + FOV_BOOST }
+	)
+	fovInTween:Play()
+
+	-- 5. Humanoid Posture Adjustment (Forward Lean)
+	local rootJoint = hrp:FindFirstChild("RootJoint")
+	local originalC0 = rootJoint and rootJoint.C0 or CFrame.new()
+
+	local renderConnection
+	if rootJoint then
+		renderConnection = RunService.RenderStepped:Connect(function()
+			rootJoint.C0 = originalC0 * CFrame.Angles(math.rad(LEAN_ANGLE_DEG), 0, 0)
+		end)
+	end
+
+	-- 6. Structured Cleanup Routine
+	task.delay(DASH_DURATION, function()
+		-- Stop active forces
+		linearVelocity:Destroy()
+		attachment:Destroy()
+
+		-- Disable particles and let existing ones fade out naturally
+		fireEmitter.Enabled = false
+		sparkEmitter.Enabled = false
+		nitroLight:Destroy()
+
+		-- Restore procedural posture & camera FOV
+		if renderConnection then
+			renderConnection:Disconnect()
+		end
+		if rootJoint then
+			rootJoint.C0 = originalC0
+		end
+
+		TweenService:Create(
+			camera,
+			TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ FieldOfView = originalFOV }
+		):Play()
+
+		-- Clean up visual attachments after particle lifetimes clear
+		Debris:AddItem(nitroAttachment, 0.5)
+	end)
+end
+
+-- Execute single dash on load
+executeDash()
